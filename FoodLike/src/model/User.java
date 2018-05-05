@@ -14,11 +14,10 @@ public class User extends Model<User>{
 	}
 	
 	//将列表转成JSON数据
-	
 	public String toJson(List<User> list, int pageCount){
 		return toJson(list, pageCount, null);
 	}
-	
+
 	public String toJson(List<User> list, int pageCount, String type){
 		StringBuffer jsonText = new StringBuffer();
 		jsonText.append("{\"error\": 0, \"page_count\": ").append(pageCount).append(", \"data\": [");
