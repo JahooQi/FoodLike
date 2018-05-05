@@ -4,9 +4,12 @@ import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.IOException;
+
 import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
+
+import redis.clients.jedis.Jedis;
 /**
  * 
  * @author ahui
@@ -15,7 +18,7 @@ import org.json.JSONObject;
 public class RedisWriteIn {
 	 public static void main(String args[]) throws IOException {
 
-	        File file=new File("D:\\test.json");
+	        /*File file=new File("D:\\test.json");
 	        Long filelength = file.length();
 	        byte[] filecontent = new byte[filelength.intValue()];
 	        try {
@@ -42,11 +45,11 @@ public class RedisWriteIn {
 				}
 			} catch (JSONException e) {
 				e.printStackTrace();
-			}
+			}*/
 		 
-		 	/*Jedis jedis = new Jedis("123.206.82.204");
+		 	Jedis jedis = new Jedis("123.206.82.204");
 	        System.out.println("连接成功");
 	        //查看服务是否运行
-	        System.out.println("服务正在运行: "+jedis.ping());*/
+	        System.out.println("服务正在运行: "+jedis.ping());
 	    }
 }

@@ -21,12 +21,10 @@ public class Watch extends Model<Watch>{
 	public static final String eachWatchedSql = "select id,nickname,avatar from users where id in (select watcher_id from (select watcher_id from watch where target_id=? and watcher_id in (select target_id from watch where watcher_id=?) limit ?,?) as news)";
 	public static final String getTargetPageCountSql = "select count(*) as num from watch where watcher_id=?";
 	public static final String getWatcherPageCountSql = "select count(*) as num from watch where target_id=?";
-	public static final String eachWatchedPageCountSql = "select watcher_id from watch where target_id=? and watcher_id in (select target_id from watch where watcher_id=?)";
+	public static final String eachWatchedPageCountSql = "select count(*) as num from watch where target_id=? and watcher_id in (select target_id from watch where watcher_id=?)";
 	public static final String addWatchSql = "insert into watch values (?,?)";
 	public static final String deleteWatchSql = "delete from watch where watcher_id=? and target_id=?";
 	public static final String checkWatchedSql = "select watcher_id from watch where watcher_id=? and target_id=?";
-	public static final String checkTargetOffsetOutSql = getTargetPageCountSql;
-	public static final String checkWatcherOffsetOutSql = getWatcherPageCountSql;
 	
 	
 	/**
@@ -37,9 +35,9 @@ public class Watch extends Model<Watch>{
 		try{
 			if(length==0) return Msg.ERROR_PER_PAGE_NUM;
 			List<User> userList = null;
-			int pageCount = 0;
+			int pageCount = getPage(userID, length,type);
+			
 			if("watcher".equals(type)){//我关注的人
-				pageCount = getPageCount(userID, length,type);
 				userList = User.dao.find(getTargetsSql, userID, offset, length);
 				for (User user : userList) {
 					if(Watch.dao.find(checkWatchedSql, user.get("id"), userID).isEmpty()) 
@@ -47,7 +45,6 @@ public class Watch extends Model<Watch>{
 					else user.set("watched", true);
 				}
 			}else if("target".equals(type)){//关注我的人
-				pageCount = getPageCount(userID, length,type);
 				userList = User.dao.find(getWatchersSql, userID, offset, length);
 				for (User user : userList) {
 					if(Watch.dao.find(checkWatchedSql, userID, user.get("id")).isEmpty()) 
@@ -57,8 +54,6 @@ public class Watch extends Model<Watch>{
 			}else if("each".equals(type)){//互相关注的人
 				userList = User.dao.find(eachWatchedSql, userID, userID, offset, length);
 				for (User user : userList) {user.set("watched", true);}
-				int num = userList.size();
-				pageCount = num==0?0:(num%length==0?num/length:(num/length)+1);
 			}else{ return Msg.ERROR_WATCH_TYPE;}
 			
 			return User.dao.toJson(userList, pageCount, "watched");
@@ -91,44 +86,12 @@ public class Watch extends Model<Watch>{
 		}
 	}
 	
-	//查询我关注的人数
-	public Integer getTargetNum(int userID){
-		try{
-			return dao.find(getTargetPageCountSql,userID).get(0).getInt("num");
-		}catch(Exception e){
-			System.out.println(e);
-			return null;
-		}
-	}
-	
-	//查询关注我的人数
-	public Integer getWatchNum(int userID){
-		try{
-			return dao.find(getWatcherPageCountSql,userID).get(0).getInt("num");
-		}catch(Exception e){
-			System.out.println(e);
-			return null;
-		}
-	}
-	
-	
-	/*//我关注的人
-	public String getTargetList(int userID,int offset, int length){
-		if(length==0) return Msg.ERROR_PER_PAGE_NUM;
-		
-		int pageCount = getPageCount(userID, length,"watcher");
-		List<User> userList = User.dao.find(getTargetsSql, userID, offset, length);
-		for (User user : userList) {
-			if(Watch.dao.find(checkWatchedSql,user.get("id"),userID).isEmpty()) 
-				user.set("watched",false);
-			else user.set("watched", true);
-		}
-		return User.dao.toJson(userList, pageCount, "watched");
-	}*/
-	
 	public String numtoJson(int userID){
-		return "{\"error\" : 0, \"target_num\": " + getTargetNum(userID) 
-				+ ", \"watcher_num\": " + getWatchNum(userID) + " }";
+		return "{\"error\" : 0, \"target_num\": " 
+				+ dao.find(getTargetPageCountSql,userID).get(0).getInt("num")	//我关注的人
+				+ ", \"watcher_num\": " 
+				+ dao.find(getWatcherPageCountSql,userID).get(0).getInt("num")	//关注我的人
+				+ " }";
 	}
 	
 	
@@ -136,15 +99,23 @@ public class Watch extends Model<Watch>{
 	 * 工具函数
 	 */
 	
-	//获取总页数
-	public int getPageCount(int userID, int length, String type){
+	//获取总条数
+	public int getCount(int userID, String type){
 		int num = 0;
-		if("watcher".equals(type)){
-			num = dao.find(getTargetPageCountSql,userID).get(0).getInt("num");
+		if("each".equals(type)){
+			num = Db.find(eachWatchedPageCountSql,userID,userID).get(0).getInt("num");
+		}else if ("watcher".equals(type)){
+			num = Db.find(getTargetPageCountSql,userID).get(0).getInt("num");
 		}else if("target".equals(type)){
-			num = dao.find(getWatcherPageCountSql,userID).get(0).getInt("num");
+			num = Db.find(getWatcherPageCountSql,userID).get(0).getInt("num");
 		}
-		System.out.println(num);
+		return num;
+	}
+	
+	
+	//获取总页数
+	public int getPage(int userID, int length, String type){
+		int num = getCount(userID, type);
 		if(num==0) return 0;
 		return num%length==0?num/length:(num/length)+1;
 	}
@@ -155,16 +126,7 @@ public class Watch extends Model<Watch>{
 	
 	//偏移量超出检测
 	public boolean checkOffsetOut(int offset, String type, int userID){
-		int num = 0;
-		if("each".equals(type)){
-			num = Db.find(eachWatchedPageCountSql,userID,userID).size();
-		}else if ("watcher".equals(type)){
-			num = Db.find(checkTargetOffsetOutSql,userID).get(0).getInt("num");
-		}else if("target".equals(type)){
-			num = Db.find(checkTargetOffsetOutSql,userID).get(0).getInt("num");
-		}
-		
-		if(offset > num) return false; else return true;
+		if(offset >= getCount(userID, type)) return false; else return true;
 	}
 	
 	//数据存在检测
